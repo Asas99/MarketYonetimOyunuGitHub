@@ -1,3 +1,4 @@
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -5,20 +6,24 @@ using UnityEngine.UI;
 public class KameraKontrol : MonoBehaviour
 {
     public float HareketHýzý, DönmeHýzý, ZoomHýzý;
-    public float MaxDönme, MinDönme, MaxOrtografikBoyut, MinOrtografikBoyut;
+    public float MaxDönme, MinDönme, MaxFOV, MinFOV;
     [Space(20)]
     public Slider ZoomSlider, AçýSlider;
     private Vector2 SonDokunmaKonumu,KesmeDelta;
+    public GameObject CameraLookOrigin;
 
     void Start()
     {
-        ZoomSlider.maxValue = MaxOrtografikBoyut;
-        ZoomSlider.minValue = MinOrtografikBoyut;
-        ZoomSlider.value = 5;
+        ZoomSlider.maxValue = MaxFOV;
+        ZoomSlider.minValue = MinFOV;
+        ZoomSlider.value = 15;
 
         AçýSlider.maxValue = MaxDönme;
         AçýSlider.minValue = MinDönme;
-        AçýSlider.value = transform.eulerAngles.x;
+        AçýSlider.value = -20;
+
+        ZoomSlider.onValueChanged.AddListener(FOVGüncelle);
+        AçýSlider.onValueChanged.AddListener(AçýyýGüncelle);
     }
     // Update is called once per frame
     void Update()
@@ -27,38 +32,38 @@ public class KameraKontrol : MonoBehaviour
             #if UNITY_EDITOR
             Vector3 Hareket = new Vector3(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
 
-            if (gameObject.GetComponent<Camera>().orthographicSize < MinOrtografikBoyut)
+            if (gameObject.GetComponent<Camera>().orthographicSize < MinFOV)
                     {
-                        gameObject.GetComponent<Camera>().orthographicSize = MinOrtografikBoyut;
+                        gameObject.GetComponent<Camera>().fieldOfView = MinFOV;
                     }
-                    if (gameObject.GetComponent<Camera>().orthographicSize > MaxOrtografikBoyut)
+                    if (gameObject.GetComponent<Camera>().fieldOfView > MaxFOV)
                     {
-                        gameObject.GetComponent<Camera>().orthographicSize = MaxOrtografikBoyut;
-                    }
-
-                    if (gameObject.GetComponent<Camera>().transform.eulerAngles.x < MinDönme)
-                    {
-                        transform.eulerAngles =new Vector3(MinDönme, transform.eulerAngles.y,transform.eulerAngles.z);
+                        gameObject.GetComponent<Camera>().fieldOfView = MaxFOV;
                     }
 
-                    if (gameObject.GetComponent<Camera>().transform.eulerAngles.x > MaxDönme)
-                    {
-                        transform.eulerAngles = new Vector3(MaxDönme, transform.eulerAngles.y, transform.eulerAngles.z);
-                    }
+        //if (CameraLookOrigin.transform.eulerAngles.x < MinDönme)
+        //{
+        //    CameraLookOrigin.transform.eulerAngles = new Vector3(MinDönme, 0, 0);
+        //}
 
-                    #region HareketKodlarý
-                        gameObject.transform.Translate(HareketHýzý * Time.deltaTime * Hareket);
+        //if (CameraLookOrigin.transform.eulerAngles.x > MaxDönme)
+        //{
+        //    CameraLookOrigin.transform.eulerAngles = new Vector3(MaxDönme, 0, 0);
+        //}
 
-                        gameObject.transform.Rotate(Input.GetAxis("Turn") * Time.deltaTime * DönmeHýzý, 0, 0);
+        #region HareketKodlarý
+        gameObject.transform.Translate(HareketHýzý * Time.deltaTime * Hareket);
 
-                        gameObject.GetComponent<Camera>().orthographicSize -= Input.GetAxis("Mouse ScrollWheel") * ZoomHýzý * Time.deltaTime;
+        gameObject.transform.Rotate(Input.GetAxis("Turn") * Time.deltaTime * DönmeHýzý, 0, 0);
+
+        gameObject.GetComponent<Camera>().fieldOfView -= Input.GetAxis("Mouse ScrollWheel") * ZoomHýzý * Time.deltaTime;
         #endregion
 
 #endif
         #endregion
 
         #region Telefon için
-        if (Input.touchCount > 1)
+        if (Input.touchCount == 1)
         {
             Touch touch = Input.GetTouch(0);
 
@@ -66,30 +71,46 @@ public class KameraKontrol : MonoBehaviour
             if (IsPointerOverUI(touch))
                 return;
 
-            if (touch.phase == TouchPhase.Moved)
-            {
-                if (KesmeDelta.magnitude > 5)
-                {
-                    Vector2 MevcutDokunmaKonumu = touch.position;
-                    KesmeDelta = MevcutDokunmaKonumu - SonDokunmaKonumu;
 
-                    // Son pozisyonu güncelle
-                    SonDokunmaKonumu = MevcutDokunmaKonumu;
+            // Saða ve sola kesme iþlemleri için
+            if (touch.phase == TouchPhase.Moved)
+            {   
+                print("Moving");
+                Vector2 MevcutDokunmaKonumu = touch.position;
+
+                KesmeDelta = MevcutDokunmaKonumu - SonDokunmaKonumu;
+                // Son pozisyonu güncelle
+                SonDokunmaKonumu = MevcutDokunmaKonumu;
+
+                if (Mathf.Abs(KesmeDelta.magnitude) > 5)
+                {
+                    transform.position -= new Vector3(KesmeDelta.x * HareketHýzý, 0, KesmeDelta.y * HareketHýzý) * Time.deltaTime;
                 }
 
             }
             else if (touch.phase == TouchPhase.Began)
             {
+                print("TOUCHED");
                 SonDokunmaKonumu = touch.position; // Ýlk pozisyonu kaydet
             }
         }
 
-
-        transform.GetComponent<Camera>().orthographicSize = ZoomSlider.value;
-        transform.eulerAngles = new Vector3(AçýSlider.value, transform.eulerAngles.y, transform.eulerAngles.z);
-        transform.position -= new Vector3(KesmeDelta.x * HareketHýzý, 0, KesmeDelta.y * HareketHýzý) * Time.deltaTime;
         #endregion
     }
+
+    public void FOVGüncelle(float value)
+    {
+        value = ZoomSlider.value;
+        transform.GetComponent<Camera>().fieldOfView = value;
+    }
+
+    public void AçýyýGüncelle(float value)
+    {
+        value = AçýSlider.value;
+        print(value);
+        CameraLookOrigin.transform.eulerAngles = new Vector3(value, 0, 0);
+    }
+
     private bool IsPointerOverUI(Touch touch)
     {
         return EventSystem.current.IsPointerOverGameObject(touch.fingerId);
